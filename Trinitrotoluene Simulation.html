@@ -1,0 +1,189 @@
+<!doctype html>
+<!--
+	Trinitrotoluene Simulation
+	by: Patrick Hadlaw
+	copyright: Patrick Stanislaw Hadlaw
+-->
+<html>
+	<head>
+		<title>Trinitrotoluene</title>
+		<link rel="stylesheet" type="text/css" href="Trinitrotoluene/stylesheet.css">
+	</head>
+	
+	<body style="text-align: center; margin-bottom: 45px">
+		<div class="header"></div>
+		<div class="footer"><b>Patrick Hadlaw</b></div>
+		<div id="banner">
+			<h1 style="text-align: left; margin: 0px; padding-left:1%">Trinitrotoluene Simulation</h1>
+			<h4 style="text-align: left; margin: 0px; padding-left:1%">By: Patrick Hadlaw</h4>
+		</div>
+		<div class="bar" style="left: 0;top:0;"></div>
+		<div class="bar" style="right: 0;top:0;"></div>
+		<br/><br/>
+		<canvas width="600" height="600"id="frame"></canvas>
+		<div class="button" style="top: 650px; left: calc(55% - 66px);" onclick="TNTSim.explode()">Detonate</div>
+		<div class="button" style="top: 650px; left: calc(45% - 56px);" onclick="TNTSim.reset()">Reset</div>
+		<br/>
+		<p style="width: 500px; margin-left: auto; margin-right: auto;">
+			Simulation of 225 molecules of TNT detonating. <b>This simulation is not to scale!</b>
+			To start the simulation press the detonate button.
+			To reset simulation press the reset button. This simulation uses this chemical equation:
+		</p>
+		<p><strong><span style="font-weight: 400;">2C</span><span style="font-weight: 400;">7</span><span style="font-weight: 400;">H</span><span style="font-weight: 400;">5</span><span style="font-weight: 400;">N</span><span style="font-weight: 400;">3</span><span style="font-weight: 400;">O</span><span style="font-weight: 400;">6 (s)</span><span style="font-weight: 400;"> &rarr; 3N</span><span style="font-weight: 400;">2 (g)</span><span style="font-weight: 400;"> + 7CO</span><span style="font-weight: 400;">(g)</span><span style="font-weight: 400;"> + 5H</span><span style="font-weight: 400;">2</span><span style="font-weight: 400;">O</span><span style="font-weight: 400;">(g)</span><span style="font-weight: 400;"> + 7C</span><span style="font-weight: 400;">(s)</span></strong></p>
+		<h2>Slowed down x100 000</h2>
+		
+		<script>
+			
+			var TNTSim = {};
+			TNTSim.tntVelocity = 6.9; // Velocity of tnt
+			TNTSim.date = new Date();
+			TNTSim.canvas = document.getElementById("frame");
+			TNTSim.particles = new Array();
+			TNTSim.particlesBackup = new Array();
+			TNTSim.context = TNTSim.canvas.getContext("2d");
+			TNTSim.dt = 0.03;
+			TNTSim.moleculeRadius = 1;
+			
+			// Particle class stores particle geometry, position and contains
+			function Particle(cx, cy, r, l, color, stroke){
+				this.cx = cx; // Center x
+				this.cy = cy; // Center y
+				this.radius = r;
+				this.line = l; // Width of arc line
+				this.color = color; // Particle color
+				this.stroke = stroke; // Stroke style
+				this.dx = 0.0;
+				this.dy = 0.0;
+				this.lx = cx;
+				this.ly = cy;
+				this.magnitude = 0.0;
+				this.update = function(){ // Draws particle
+					TNTSim.context.beginPath();
+					TNTSim.context.arc(this.cx, this.cy, this.radius, 0, 2 * Math.PI, false);
+					TNTSim.context.fillStyle = this.color;
+					TNTSim.context.fill();
+					TNTSim.context.lineWidth = this.l;
+					TNTSim.context.strokeStyle = this.stroke;
+					TNTSim.context.stroke();
+				}
+			}
+			
+			// ParticleGroup function generates an array of a square grouping of n particles
+			function ParticleGroup(n, cx, cy, r, f, color){
+				n = n;
+				dx = f * r;
+				dy = f * r;
+				ecx = cx - (Math.floor(Math.sqrt(n))*dx)/2;
+				ecy = cy - (Math.floor(Math.sqrt(n))*dy)/2;
+				nummade = 1;
+				var pg = [new Particle(ecx, ecy, r, 0, color, color)];
+				
+				// Generation of an array of particles that are aligned in a square formation
+				for(var i = 0; i < Math.floor(Math.sqrt(n)); i++){
+					for(var j = 0; j < Math.floor(Math.sqrt(n)); j++){
+						pg.push(new Particle(ecx+(i*dx), ecy+(j*dy), r, 0, color, color));
+						nummade++;
+					}
+				}
+				
+				var z = 0;
+				while(nummade+z<n){
+					pg.push(new Particle((Math.floor(Math.sqrt(n))) + 1 + ecx, ecy+(z*dy)));
+					z++;
+				}
+				return pg;
+			}
+			
+			// Resets simulation on click of reset button
+			TNTSim.reset = function(){
+				TNTSim.particles = new Array();
+				TNTSim.particlesBackup = new Array();
+				TNTSim.particlesBackup = ParticleGroup(2475, TNTSim.canvas.width/2, TNTSim.canvas.height/2, TNTSim.moleculeRadius/4, 5, "#000000");
+				TNTSim.particles = ParticleGroup(225, TNTSim.canvas.width/2, TNTSim.canvas.height/2, TNTSim.moleculeRadius, 2.2, "#000000");
+			}
+			TNTSim.reset();
+			
+			// Clears canvas
+			TNTSim.clear = function(){
+				TNTSim.context.clearRect(0, 0, TNTSim.canvas.width, TNTSim.canvas.height);
+			}
+			
+			// Updates particle positions and draws all particles, calls TNTSim.collisionCheck function to detect collision against edge of canvas
+			TNTSim.update = function(){
+			
+				TNTSim.clear();
+				
+				for(var i = 0;i < TNTSim.particles.length; i++){
+					TNTSim.particles[i].lx = TNTSim.particles[i].cx;
+					TNTSim.particles[i].ly = TNTSim.particles[i].cy;
+					
+					// Calculation for force of drag
+					f = (0.5*1.225*Math.pow(TNTSim.particles[i].magnitude, 2))*(2*(Math.PI*Math.pow((TNTSim.particles[i].radius/38), 2))*5); 
+					deltaV = (f/0.2271311)*TNTSim.dt; //deltaV
+					TNTSim.particles[i].magnitude = TNTSim.particles[i].magnitude - deltaV;
+					
+					if(TNTSim.particles[i].magnitude < 0){
+						TNTSim.particles[i].magnitude = 0;
+					}
+					
+					TNTSim.particles[i].cx = TNTSim.particles[i].cx + TNTSim.particles[i].dx*(TNTSim.particles[i].magnitude*38*TNTSim.dt);
+					TNTSim.particles[i].cy = TNTSim.particles[i].cy + TNTSim.particles[i].dy*(TNTSim.particles[i].magnitude*38*TNTSim.dt);
+					TNTSim.collisionCheck(TNTSim.particles[i]);
+					
+					TNTSim.particles[i].update();
+				}
+			}
+			TNTSim.interval = setInterval(TNTSim.update, 30);
+			
+			// Triggers explosion, sets velocity of each particle pointing outward (random change added to simulate real explosion)
+			TNTSim.explode = function(){
+				TNTSim.particles = TNTSim.particlesBackup;
+				allx = 0.0;
+				ally = 0.0;
+				for (var i = 0; i < TNTSim.particles.length; i++) {
+					allx = allx + TNTSim.particles[i].cx;
+					ally = ally + TNTSim.particles[i].cy;
+				}
+				xave = allx/TNTSim.particles.length;
+				yave = ally/TNTSim.particles.length;
+				
+				for(var i = 0;i<TNTSim.particles.length;i++){
+					
+					x = (TNTSim.particles[i].cx - xave)*((Math.random() * 1.2) + 0.8);
+					y = (TNTSim.particles[i].cy - yave)*((Math.random() * 1.2) + 0.8);
+					a = Math.atan(y/x);
+					xn = 1 * Math.cos(a);
+					yn = 1 * Math.sin(a);
+					if (x<0){
+						xn = -xn;
+						yn = -yn;
+					}
+					TNTSim.particles[i].dx = xn;
+					TNTSim.particles[i].dy = yn;
+					TNTSim.particles[i].magnitude = TNTSim.tntVelocity*((Math.random() * 1.2) + 0.8);
+					
+				}
+			}
+			
+			TNTSim.collisionCheck = function(p){
+				if(p.cx < 0 + p.radius){ // If particle is left of canvas
+					p.cx = -p.cx;
+					p.dx = -p.dx;
+				}
+				else if(p.cx > TNTSim.canvas.width - p.radius){ // If particle is right of canvas
+					p.cx = TNTSim.canvas.width - (p.cx - TNTSim.canvas.width);
+					p.dx = -p.dx;
+				}
+				if(p.cy < 0 + p.radius){ // If particle is above canvas
+					p.cy = -p.cy;
+					p.dy = -p.dy;
+				}
+				else if(p.cy > TNTSim.canvas.height - p.radius){ // If particle is below canvas
+					p.cy = TNTSim.canvas.height - (p.cy - TNTSim.canvas.height);
+					p.dy = -p.dy;
+				}
+			}
+			
+		</script>
+	</body>
+</html>
